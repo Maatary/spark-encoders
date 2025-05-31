@@ -5,6 +5,8 @@ target/
 
 ### IntelliJ IDEA ###
 .idea/
+.idea/misc.xml
+.idea/sbt.xml
 .idea/jarRepositories.xml
 .idea/compiler.xml
 .idea/libraries/
