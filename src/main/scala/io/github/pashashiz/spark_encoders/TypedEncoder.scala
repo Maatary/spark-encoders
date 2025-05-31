@@ -124,9 +124,25 @@ trait TypedEncoderImplicits extends Derivation {
   implicit def optionEncoder[A: TypedEncoder]: TypedEncoder[Option[A]] =
     OptionEncoder()
 
+//  def kryo[A: ClassTag]: TypedEncoder[A] = {
+//    val external = Encoders.kryo[A].asInstanceOf[ExpressionEncoder[A]]
+//    ExternalEncoder(external)
+//  }
+
   def kryo[A: ClassTag]: TypedEncoder[A] = {
-    val external = Encoders.kryo[A].asInstanceOf[ExpressionEncoder[A]]
-    ExternalEncoder(external)
+    // Spark gives us a generic Encoder (may be Expression- or Agnostic-)
+    Encoders.kryo[A] match {
+
+      // Spark 3 path – the cast is still valid
+      case ee: ExpressionEncoder[A] =>
+        ExternalEncoder(ee)
+
+      // Spark 4 path – build the missing ExpressionEncoder layer
+      case ag: AgnosticEncoder[A] =>
+        // Spark has a helper for that:
+        //   ExpressionEncoder.apply[T](agnostic)
+        ExternalEncoder(ExpressionEncoder(ag))
+    }
   }
 
   implicit def udt[A >: Null: ClassTag](implicit instance: UserDefinedType[A]): TypedEncoder[A] =
