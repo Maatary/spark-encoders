@@ -2,7 +2,7 @@ package io.github.pashashiz.spark_encoders
 
 import org.apache.spark.sql.Encoders
 import org.apache.spark.sql.catalyst.analysis.GetColumnByOrdinal
-import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
+import org.apache.spark.sql.catalyst.encoders.{AgnosticEncoder, ExpressionEncoder}
 import org.apache.spark.sql.catalyst.expressions.{BoundReference, Expression}
 import org.apache.spark.sql.catalyst.types.DataTypeUtils.toAttributes
 import org.apache.spark.sql.types._
@@ -11,7 +11,7 @@ import org.apache.spark.util.PrivateClosureCleaner
 import java.io.Serializable
 import java.math.{BigDecimal => JBigDecimal, BigInteger => JBigInt}
 import java.sql.{Date, Timestamp}
-import java.time.{Duration => JDuration, Instant, LocalDate, LocalDateTime, OffsetDateTime, Period, ZonedDateTime}
+import java.time.{Instant, LocalDate, LocalDateTime, OffsetDateTime, Period, ZonedDateTime, Duration => JDuration}
 import java.util.UUID
 import scala.concurrent.duration.FiniteDuration
 import scala.language.experimental.macros
@@ -33,15 +33,30 @@ abstract class TypedEncoder[A](implicit val classTag: ClassTag[A]) extends Seria
 
   def fromCatalyst(path: Expression): Expression
 
+//  def encoder: ExpressionEncoder[A] = {
+//    // input is always BoundReference with single element
+//    val in = BoundReference(0, jvmRepr, nullable)
+//    // output is always GetColumnByOrdinal with single element
+//    val out = GetColumnByOrdinal(0, catalystRepr)
+//    new ExpressionEncoder[A](
+//      objSerializer = toCatalyst(in),
+//      objDeserializer = fromCatalyst(out),
+//      clsTag = classTag)
+//  }
+
   def encoder: ExpressionEncoder[A] = {
-    // input is always BoundReference with single element
+
     val in = BoundReference(0, jvmRepr, nullable)
-    // output is always GetColumnByOrdinal with single element
     val out = GetColumnByOrdinal(0, catalystRepr)
-    new ExpressionEncoder[A](
-      objSerializer = toCatalyst(in),
-      objDeserializer = fromCatalyst(out),
-      clsTag = classTag)
+
+    val agn: AgnosticEncoder[A] = new AgnosticEncoder[A] {
+      def isPrimitive          : Boolean     = runtimeClass.isPrimitive
+      def dataType             : DataType    = catalystRepr
+      override val clsTag      : ClassTag[A] = classTag
+      // `nullable`, `isStruct`, etc. inherit sensible defaults
+    }
+
+    new ExpressionEncoder[A](agn, toCatalyst(in), fromCatalyst(out))
   }
 
   def encoderResolved: ExpressionEncoder[A] = {

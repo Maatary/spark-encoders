@@ -4,6 +4,7 @@ target/
 !**/src/test/**/target/
 
 ### IntelliJ IDEA ###
+.idea/
 .idea/modules.xml
 .idea/jarRepositories.xml
 .idea/compiler.xml
@@ -14,6 +15,7 @@ target/
 out/
 !**/src/main/**/out/
 !**/src/test/**/out/
+
 
 ### Eclipse ###
 .apt_generated

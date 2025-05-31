@@ -1,5 +1,7 @@
 package org.apache.spark.util
 
+import scala.collection.mutable
+
 object PrivateClosureCleaner {
 
   /** Clean the given closure in place.
@@ -15,5 +17,9 @@ object PrivateClosureCleaner {
       closure: AnyRef,
       checkSerializable: Boolean = true,
       cleanTransitively: Boolean = true): Unit =
-    ClosureCleaner.clean(closure, checkSerializable, cleanTransitively)
+    ClosureCleaner.clean(
+      closure,
+      cleanTransitively,
+      mutable.Map.empty[Class[_], mutable.Set[String]]
+    )
 }
