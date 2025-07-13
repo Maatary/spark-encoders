@@ -15,5 +15,5 @@ object PrivateClosureCleaner {
       closure: AnyRef,
       checkSerializable: Boolean = true,
       cleanTransitively: Boolean = true): Unit =
-    ClosureCleaner.clean(closure, checkSerializable, cleanTransitively)
+    SparkClosureCleaner.clean(closure, checkSerializable, cleanTransitively)
 }

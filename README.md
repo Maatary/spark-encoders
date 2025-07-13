@@ -6,9 +6,11 @@ This is a light-weight Scala library for compile-time derivation of Spark `org.a
 comprehensive support for standard Scala data types (ADTs, Enums, Either, Try, collections, durations, etc.) and is
 designed for easy extension with custom types.
 
-The library supports Scala `2.12`, `2.13`, and Scala `3`. The Scala 2 version has a single external dependency
+The library supports Scala `2.13` and Scala `3`. The Scala 2.13 version has a single external dependency
 on [magnolia](https://github.com/softwaremill/magnolia/tree/scala2); the Scala 3 version has no external dependencies.
 We plan to remove the Magnolia dependency in the future to make the library even lighter.
+
+This release targets **Spark 4.0** and requires **Java 17** for both building and running the tests.
 
 Spark requires an `Encoder[A]` for `Dataset[A]` operations and when parallelizing collections. Encoders handle the
 crucial serialization/deserialization between Scala objects and Spark's internal `Row` format (used by Catalyst),
