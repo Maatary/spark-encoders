@@ -2,10 +2,11 @@ package io.github.pashashiz.spark_encoders
 
 import org.apache.spark.SparkException
 import org.apache.spark.sql.catalyst.analysis.UnresolvedExtractValue
-import org.apache.spark.sql.catalyst.encoders.AgnosticEncoder
+import org.apache.spark.sql.catalyst.encoders.{AgnosticEncoder, AgnosticEncoders}
+import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.{EncoderField, ProductEncoder => StructEncoder}
 import org.apache.spark.sql.catalyst.expressions.objects.AssertNotNull
 import org.apache.spark.sql.catalyst.expressions.{CaseWhen, CreateNamedStruct, EqualTo, Expression, If, IsNull, Literal, UpCast}
-import org.apache.spark.sql.types.{DataType, StringType, StructField, StructType}
+import org.apache.spark.sql.types.{DataType, Metadata, StringType, StructField, StructType}
 import io.github.pashashiz.spark_encoders.expressions.{AsInstanceOf, ClassSimpleName}
 
 import scala.reflect.ClassTag
@@ -40,32 +41,34 @@ class ADTClassEncoder[A: ClassTag](typeNames: List[String], encoders: => List[Ty
           s"ADT case should have StructType schema but was $other")
     }
 
-  override val catalystRepr: DataType = {
-    val typeField = StructField("_type", StringType, nullable = false)
-    val fields = typeNames.zip(encoders)
-      .flatMap {
-        case (typeName, encoder) =>
-          val fields = extractStructFields(encoder)
-          fields.map { field => (typeName, field) }
+  private case class FieldWithEncoder(field: StructField, encoder: TypedEncoder[?])
+
+  private lazy val fieldsWithEncoders: List[FieldWithEncoder] =
+    typeNames.zip(encoders)
+      .flatMap { (typeName, encoder) =>
+        val fields = extractStructFields(encoder)
+        fields.map(f => (f, encoder))
       }
-      .groupBy(_._2.name)
+      .groupBy(_._1.name)
       .toList
       .sortBy(_._1)
-      .map {
-        case (fieldName, candidates) =>
-          val fields = candidates.map(_._2)
-          val types = fields.map(_.dataType).distinct
-          if (types.size == 1) {
-            val required = fields.count(!_.nullable) == typeNames.size
-            fields.head.copy(nullable = !required)
-          } else {
-            throw throw SparkException.internalError(
-              s"Standard ADT encoder does not support subtypes that have same field names " +
+      .map { (fieldName, candidates) =>
+        val fields = candidates.map(_._1)
+        val encs = candidates.map(_._2)
+        val types = fields.map(_.dataType).distinct
+        if types.size == 1 then
+          val required = fields.count(!_.nullable) == typeNames.size
+          FieldWithEncoder(fields.head.copy(nullable = !required), encs.head)
+        else
+          throw SparkException.internalError(
+            s"Standard ADT encoder does not support subtypes that have same field names " +
               s"with different types. Field '$fieldName' has conflicting types: ${types.mkString(", ")}")
-          }
       }
+
+  override val catalystRepr: DataType =
+    val typeField = StructField("_type", StringType, nullable = false)
+    val fields = fieldsWithEncoders.map(_.field)
     StructType(typeField +: fields)
-  }
 
   override def toCatalyst(path: Expression): Expression = {
     val classSimpleName = AssertNotNull(ClassSimpleName(path))
@@ -123,11 +126,9 @@ class ADTClassEncoder[A: ClassTag](typeNames: List[String], encoders: => List[Ty
   override def toString: String = s"ADTClassEncoder($jvmRepr)"
 
   override protected[spark_encoders] def agnostic: AgnosticEncoder[A] =
-    new AgnosticEncoder[A] {
-      override def isPrimitive: Boolean = false
-      override def dataType: DataType = catalystRepr
-      override def nullable: Boolean = ADTClassEncoder.this.nullable
-      override def clsTag: ClassTag[A] = implicitly[ClassTag[A]]
-      override def isStruct: Boolean = true
+    val typeField = EncoderField("_type", TypedEncoder.stringEncoder.agnostic, false, Metadata.empty)
+    val fields = fieldsWithEncoders.map { f =>
+      EncoderField(f.field.name, f.encoder.agnostic, f.field.nullable, f.field.metadata)
     }
+    StructEncoder(implicitly[ClassTag[A]], typeField +: fields, None)
 }

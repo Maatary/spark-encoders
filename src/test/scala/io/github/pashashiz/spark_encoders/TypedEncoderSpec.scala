@@ -242,9 +242,22 @@ class TypedEncoderSpec extends SparkAnyWordSpec() with TypedEncoderMatchers with
         ds.schema shouldBe StructType(Seq.empty)
         ds.collect().head shouldBe EmptyCaseObject
       }
+
+      "expose struct metadata" in {
+        val enc = TypedEncoder[SimpleUser].encoder.resolveAndBind()
+        enc.encoder.isStruct shouldBe true
+        enc.encoder.schema.fieldNames.toSeq shouldBe Seq("name", "age")
+      }
     }
 
     "used with ADT type" should {
+
+      "expose struct metadata" in {
+        val enc = TypedEncoder[WorkItem].encoder.resolveAndBind()
+        enc.encoder.isStruct shouldBe true
+        enc.encoder.schema.fieldNames.headOption shouldBe Some("_type")
+        enc.encoder.schema.fieldNames.contains("value") shouldBe false
+      }
 
       "support sub types with 1 same field and 1 different" in {
         val schema = StructType(Seq(
