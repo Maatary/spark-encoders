@@ -1,6 +1,6 @@
 package io.github.pashashiz.spark_encoders
 
-import org.apache.spark.sql.catalyst.encoders.EncoderUtils
+import org.apache.spark.sql.catalyst.encoders.{AgnosticEncoder, AgnosticEncoders, EncoderUtils}
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.expressions.objects.{UnwrapOption, WrapOption}
 import org.apache.spark.sql.types.{DataType, ObjectType}
@@ -12,6 +12,9 @@ case class OptionEncoder[A]()(implicit inner: TypedEncoder[A]) extends TypedEnco
   override def nullable = true
 
   override def catalystRepr: DataType = inner.catalystRepr
+
+  override protected[spark_encoders] def agnostic: AgnosticEncoder[Option[A]] =
+    AgnosticEncoders.OptionEncoder(inner.agnostic)
 
   override def toCatalyst(path: Expression): Expression = {
     // note: we want to make sure we always get Object type here,

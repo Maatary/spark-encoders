@@ -1,5 +1,6 @@
 package io.github.pashashiz.spark_encoders
 
+import org.apache.spark.sql.catalyst.encoders.{AgnosticEncoder, AgnosticEncoders}
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.expressions.objects.{AssertNotNull, MapObjects, NewInstance}
 import org.apache.spark.sql.catalyst.util.GenericArrayData
@@ -52,6 +53,13 @@ case class SeqEncoder[C[_] <: collection.Seq[_], A]()(implicit
       elementType = elementEncoder.catalystRepr,
       elementNullable = elementEncoder.nullable,
       customCollectionCls = Some(targetCollection.runtimeClass))
+
+  override protected[spark_encoders] def agnostic: AgnosticEncoder[collection.Seq[A]] =
+    AgnosticEncoders.IterableEncoder(
+      classTag,
+      elementEncoder.agnostic,
+      elementEncoder.nullable,
+      lenientSerialization = false)
 
   override def toString: String = s"SeqEncoder($jvmRepr)"
 }

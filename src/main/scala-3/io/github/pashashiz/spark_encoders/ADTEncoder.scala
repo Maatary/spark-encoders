@@ -2,6 +2,7 @@ package io.github.pashashiz.spark_encoders
 
 import org.apache.spark.SparkException
 import org.apache.spark.sql.catalyst.analysis.UnresolvedExtractValue
+import org.apache.spark.sql.catalyst.encoders.AgnosticEncoder
 import org.apache.spark.sql.catalyst.expressions.objects.AssertNotNull
 import org.apache.spark.sql.catalyst.expressions.{CaseWhen, CreateNamedStruct, EqualTo, Expression, If, IsNull, Literal, UpCast}
 import org.apache.spark.sql.types.{DataType, StringType, StructField, StructType}
@@ -120,4 +121,13 @@ class ADTClassEncoder[A: ClassTag](typeNames: List[String], encoders: => List[Ty
   }
 
   override def toString: String = s"ADTClassEncoder($jvmRepr)"
+
+  override protected[spark_encoders] def agnostic: AgnosticEncoder[A] =
+    new AgnosticEncoder[A] {
+      override def isPrimitive: Boolean = false
+      override def dataType: DataType = catalystRepr
+      override def nullable: Boolean = ADTClassEncoder.this.nullable
+      override def clsTag: ClassTag[A] = implicitly[ClassTag[A]]
+      override def isStruct: Boolean = true
+    }
 }

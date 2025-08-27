@@ -1,5 +1,6 @@
 package io.github.pashashiz.spark_encoders
 
+import org.apache.spark.sql.catalyst.encoders.{AgnosticEncoder, AgnosticEncoders}
 import org.apache.spark.sql.catalyst.expressions.codegen.CodeGenerator
 import org.apache.spark.sql.catalyst.expressions.objects.{AssertNotNull, Invoke, MapObjects, StaticInvoke}
 import org.apache.spark.sql.catalyst.expressions.{Expression, UnsafeArrayData}
@@ -42,6 +43,9 @@ case class PrimitiveArrayEncoder[A]()(implicit
       functionName = s"to${CodeGenerator.javaType(elementEncoder.jvmRepr).capitalize}Array",
       dataType = jvmRepr)
 
+  override protected[spark_encoders] def agnostic: AgnosticEncoder[Array[A]] =
+    AgnosticEncoders.ArrayEncoder(elementEncoder.agnostic, elementEncoder.nullable)
+
   override def toString: String = s"ArrayEncoder($jvmRepr)"
 }
 
@@ -81,6 +85,9 @@ case class ObjectArrayEncoder[A]()(implicit
       functionName = "array",
       dataType = jvmRepr)
   }
+
+  override protected[spark_encoders] def agnostic: AgnosticEncoder[Array[A]] =
+    AgnosticEncoders.ArrayEncoder(elementEncoder.agnostic, elementEncoder.nullable)
 
   override def toString: String = s"ArrayEncoder($jvmRepr)"
 }

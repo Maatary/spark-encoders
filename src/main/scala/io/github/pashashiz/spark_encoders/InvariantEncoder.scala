@@ -1,5 +1,6 @@
 package io.github.pashashiz.spark_encoders
 
+import org.apache.spark.sql.catalyst.encoders.AgnosticEncoder
 import org.apache.spark.sql.catalyst.expressions.objects.Invoke
 import org.apache.spark.sql.catalyst.expressions.{Expression, Literal}
 import org.apache.spark.sql.types.DataType
@@ -43,4 +44,16 @@ case class InvariantEncoder[A, B](invariant: Invariant[A, B])(
   }
 
   override def toString: String = s"InvariantEncoder($jvmRepr -> ${invEncoder.jvmRepr})"
+
+  override protected[spark_encoders] def agnostic: AgnosticEncoder[A] = {
+    val inner = invEncoder.agnostic
+    new AgnosticEncoder[A] {
+      override def isPrimitive: Boolean = inner.isPrimitive
+      override def dataType: DataType = inner.dataType
+      override def nullable: Boolean = inner.nullable
+      override def clsTag: ClassTag[A] = classTag
+      override def lenientSerialization: Boolean = inner.lenientSerialization
+      override def isStruct: Boolean = inner.isStruct
+    }
+  }
 }

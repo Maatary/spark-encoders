@@ -3,6 +3,7 @@ package io.github.pashashiz.spark_encoders
 import io.github.pashashiz.spark_encoders.expressions.ObjectInstance
 import magnolia1.CaseClass
 import org.apache.spark.sql.catalyst.analysis.UnresolvedExtractValue
+import org.apache.spark.sql.catalyst.encoders.AgnosticEncoder
 import org.apache.spark.sql.catalyst.expressions.objects.{AssertNotNull, Invoke, NewInstance}
 import org.apache.spark.sql.catalyst.expressions.{CreateNamedStruct, Expression, If, IsNull, KnownNotNull, Literal, UpCast}
 import org.apache.spark.sql.types.{DataType, Metadata, StructField, StructType}
@@ -26,6 +27,15 @@ class CaseObjectEncoder[A: ClassTag] extends TypedEncoder[A] {
     ObjectInstance(runtimeClass)
 
   override def toString: String = s"CaseObjectEncoder($jvmRepr)"
+
+  override protected[spark_encoders] def agnostic: AgnosticEncoder[A] =
+    new AgnosticEncoder[A] {
+      override def isPrimitive: Boolean = false
+      override def dataType: DataType = catalystRepr
+      override def nullable: Boolean = CaseObjectEncoder.this.nullable
+      override def clsTag: ClassTag[A] = implicitly[ClassTag[A]]
+      override def isStruct: Boolean = true
+    }
 }
 
 class CaseClassEncoder[A: ClassTag](ctx: CaseClass[TypedEncoder, A]) extends TypedEncoder[A] {
@@ -83,4 +93,13 @@ class CaseClassEncoder[A: ClassTag](ctx: CaseClass[TypedEncoder, A]) extends Typ
   }
 
   override def toString: String = s"CaseClassEncoder($jvmRepr)"
+
+  override protected[spark_encoders] def agnostic: AgnosticEncoder[A] =
+    new AgnosticEncoder[A] {
+      override def isPrimitive: Boolean = false
+      override def dataType: DataType = catalystRepr
+      override def nullable: Boolean = CaseClassEncoder.this.nullable
+      override def clsTag: ClassTag[A] = implicitly[ClassTag[A]]
+      override def isStruct: Boolean = true
+    }
 }

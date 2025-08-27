@@ -35,7 +35,7 @@ abstract class TypedEncoder[A](implicit val classTag: ClassTag[A]) extends Seria
 
   def isPrimitive: Boolean = false
 
-  protected def agnostic: AgnosticEncoder[A] =
+  protected[spark_encoders] def agnostic: AgnosticEncoder[A] =
     new AgnosticEncoder[A] {
       override def isPrimitive: Boolean = TypedEncoder.this.isPrimitive
       override def dataType: DataType = catalystRepr
