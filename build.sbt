@@ -1,5 +1,5 @@
 inThisBuild(List(
-  scalaVersion := "2.13.16",
+  scalaVersion := "3.3.6",
   crossScalaVersions := Seq("2.13.16", "3.3.6"),
   organization := "io.github.pashashiz",
   homepage := Some(url("https://github.com/pashashiz")),
