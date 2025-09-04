@@ -1,7 +1,7 @@
 package io.github.pashashiz.spark_encoders
 
 import org.apache.spark.sql.catalyst.analysis.GetColumnByOrdinal
-import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
+import org.apache.spark.sql.catalyst.encoders.{AgnosticEncoder, AgnosticEncoders, ExpressionEncoder}
 import org.apache.spark.sql.catalyst.expressions.{BoundReference, Expression}
 import org.apache.spark.sql.types.DataType
 
@@ -24,4 +24,7 @@ case class ExternalEncoder[T: ClassTag](external: ExpressionEncoder[T]) extends 
       case GetColumnByOrdinal(0, _) => path
     }
   }
+
+  override protected[spark_encoders] def agnostic: AgnosticEncoder[T] =
+    AgnosticEncoders.agnosticEncoderFor(external)
 }

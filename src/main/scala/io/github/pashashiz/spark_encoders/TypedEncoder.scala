@@ -2,7 +2,7 @@ package io.github.pashashiz.spark_encoders
 
 import org.apache.spark.sql.Encoders
 import org.apache.spark.sql.catalyst.analysis.GetColumnByOrdinal
-import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
+import org.apache.spark.sql.catalyst.encoders.{AgnosticEncoder, ExpressionEncoder, AgnosticEncoders}
 import org.apache.spark.sql.catalyst.expressions.{BoundReference, Expression}
 import org.apache.spark.sql.catalyst.types.DataTypeUtils.toAttributes
 import org.apache.spark.sql.types._
@@ -33,15 +33,25 @@ abstract class TypedEncoder[A](implicit val classTag: ClassTag[A]) extends Seria
 
   def fromCatalyst(path: Expression): Expression
 
+  def isPrimitive: Boolean = false
+
+  protected[spark_encoders] def agnostic: AgnosticEncoder[A] =
+    new AgnosticEncoder[A] {
+      override def isPrimitive: Boolean = TypedEncoder.this.isPrimitive
+      override def dataType: DataType = catalystRepr
+      override def nullable: Boolean = TypedEncoder.this.nullable
+      override def clsTag: ClassTag[A] = classTag
+    }
+
   def encoder: ExpressionEncoder[A] = {
     // input is always BoundReference with single element
     val in = BoundReference(0, jvmRepr, nullable)
     // output is always GetColumnByOrdinal with single element
     val out = GetColumnByOrdinal(0, catalystRepr)
     new ExpressionEncoder[A](
-      objSerializer = toCatalyst(in),
-      objDeserializer = fromCatalyst(out),
-      clsTag = classTag)
+      agnostic,
+      toCatalyst(in),
+      fromCatalyst(out))
   }
 
   def encoderResolved: ExpressionEncoder[A] = {
@@ -110,7 +120,7 @@ trait TypedEncoderImplicits extends Derivation {
     OptionEncoder()
 
   def kryo[A: ClassTag]: TypedEncoder[A] = {
-    val external = Encoders.kryo[A].asInstanceOf[ExpressionEncoder[A]]
+    val external = ExpressionEncoder(AgnosticEncoders.agnosticEncoderFor(Encoders.kryo[A]))
     ExternalEncoder(external)
   }
 

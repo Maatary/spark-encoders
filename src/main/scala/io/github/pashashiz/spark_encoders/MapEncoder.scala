@@ -1,5 +1,6 @@
 package io.github.pashashiz.spark_encoders
 
+import org.apache.spark.sql.catalyst.encoders.{AgnosticEncoder, AgnosticEncoders}
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.expressions.objects.{AssertNotNull, CatalystToExternalMap, ExternalMapToCatalyst, UnresolvedCatalystToExternalMap}
 import org.apache.spark.sql.types.{DataType, MapType}
@@ -51,6 +52,13 @@ case class MapEncoder[C[_, _] <: collection.Map[_, _], A, B]()(implicit
         valueFunction = valueEncoder.fromCatalyst,
         collClass = collClass))
   }
+
+  override protected[spark_encoders] def agnostic: AgnosticEncoder[collection.Map[A, B]] =
+    AgnosticEncoders.MapEncoder(
+      classTag,
+      keyEncoder.agnostic,
+      valueEncoder.agnostic,
+      valueEncoder.nullable)
 }
 
 // in case produced Map is not a subtype of expected, upcast using builder (i.e. TreeMap)

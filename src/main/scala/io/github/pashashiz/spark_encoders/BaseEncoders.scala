@@ -32,6 +32,7 @@ abstract class PrimitiveEncoder[T: ClassTag](dataType: DataType) extends TypedEn
   override def catalystRepr = dataType
   def toCatalyst(path: Expression): Expression = path
   def fromCatalyst(path: Expression): Expression = path
+  override def isPrimitive: Boolean = true
 }
 
 case object BooleanEncoder extends PrimitiveEncoder[Boolean](BooleanType)

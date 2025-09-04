@@ -4,9 +4,11 @@ import io.github.pashashiz.spark_encoders.expressions.{AsInstanceOf, ClassSimple
 import magnolia1.{SealedTrait, Subtype}
 import org.apache.spark.SparkException
 import org.apache.spark.sql.catalyst.analysis.UnresolvedExtractValue
+import org.apache.spark.sql.catalyst.encoders.{AgnosticEncoder, AgnosticEncoders}
+import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.{EncoderField, ProductEncoder => StructEncoder}
 import org.apache.spark.sql.catalyst.expressions.objects.AssertNotNull
 import org.apache.spark.sql.catalyst.expressions.{CaseWhen, CreateNamedStruct, EqualTo, Expression, If, IsNull, Literal, UpCast}
-import org.apache.spark.sql.types.{DataType, StringType, StructField, StructType}
+import org.apache.spark.sql.types.{DataType, Metadata, StringType, StructField, StructType}
 
 import scala.reflect.ClassTag
 
@@ -45,30 +47,35 @@ class ADTClassEncoder[A: ClassTag](ctx: SealedTrait[TypedEncoder, A]) extends Ty
           s"ADT case should have StructType schema but was $other")
     }
 
-  override val catalystRepr: DataType = {
-    val typeField = StructField("_type", StringType, nullable = false)
-    val fields = ctx.subtypes
+  private case class FieldWithEncoder(field: StructField, encoder: TypedEncoder[_])
+
+  private lazy val fieldsWithEncoders: List[FieldWithEncoder] = {
+    ctx.subtypes
       .flatMap { subtype =>
         val fields = extractStructFields(subtype)
-        val typeName = subtype.typeName.short
-        fields.map { field => (typeName, field) }
+        fields.map(f => (f, subtype.typeclass))
       }
-      .groupBy(_._2.name)
+      .groupBy(_._1.name)
       .toList
       .sortBy(_._1)
-      .map {
-        case (fieldName, candidates) =>
-          val fields = candidates.map(_._2)
-          val types = fields.map(_.dataType).distinct
-          if (types.size == 1) {
-            val required = fields.count(!_.nullable) == ctx.subtypes.size
-            fields.head.copy(nullable = !required)
-          } else {
-            throw throw SparkException.internalError(
-              s"Standard ADT encoder does not support subtypes that have same field names " +
+      .map { case (fieldName, candidates) =>
+        val fields = candidates.map(_._1)
+        val encs = candidates.map(_._2)
+        val types = fields.map(_.dataType).distinct
+        if (types.size == 1) {
+          val required = fields.count(!_.nullable) == ctx.subtypes.size
+          FieldWithEncoder(fields.head.copy(nullable = !required), encs.head)
+        } else {
+          throw SparkException.internalError(
+            s"Standard ADT encoder does not support subtypes that have same field names " +
               s"with different types. Field '$fieldName' has conflicting types: ${types.mkString(", ")}")
-          }
+        }
       }
+  }
+
+  override val catalystRepr: DataType = {
+    val typeField = StructField("_type", StringType, nullable = false)
+    val fields = fieldsWithEncoders.map(_.field)
     StructType(typeField +: fields)
   }
 
@@ -124,4 +131,12 @@ class ADTClassEncoder[A: ClassTag](ctx: SealedTrait[TypedEncoder, A]) extends Ty
   }
 
   override def toString: String = s"ADTClassEncoder($jvmRepr)"
+
+  override protected[spark_encoders] def agnostic: AgnosticEncoder[A] = {
+    val typeField = EncoderField("_type", TypedEncoder.stringEncoder.agnostic, nullable = false, Metadata.empty)
+    val fields = fieldsWithEncoders.map { f =>
+      EncoderField(f.field.name, f.encoder.agnostic, f.field.nullable, f.field.metadata)
+    }
+    StructEncoder(implicitly[ClassTag[A]], typeField +: fields, None)
+  }
 }

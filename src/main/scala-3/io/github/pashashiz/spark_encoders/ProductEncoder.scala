@@ -1,6 +1,8 @@
 package io.github.pashashiz.spark_encoders
 
 import org.apache.spark.sql.catalyst.analysis.UnresolvedExtractValue
+import org.apache.spark.sql.catalyst.encoders.{AgnosticEncoder, AgnosticEncoders}
+import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.{EncoderField, ProductEncoder => StructEncoder}
 import org.apache.spark.sql.catalyst.expressions.objects.{AssertNotNull, Invoke, NewInstance}
 import org.apache.spark.sql.catalyst.expressions.{CreateNamedStruct, Expression, If, IsNull, KnownNotNull, Literal, UpCast}
 import org.apache.spark.sql.types.{DataType, Metadata, StructField, StructType}
@@ -19,6 +21,9 @@ class CaseObjectEncoder[A: ClassTag] extends TypedEncoder[A] {
     ObjectInstance(runtimeClass)
 
   override def toString: String = s"CaseObjectEncoder($jvmRepr)"
+
+  override protected[spark_encoders] def agnostic: AgnosticEncoder[A] =
+    StructEncoder(implicitly[ClassTag[A]], Seq.empty, None)
 }
 
 class CaseClassEncoder[A: ClassTag](
@@ -81,4 +86,10 @@ class CaseClassEncoder[A: ClassTag](
   }
 
   override def toString: String = s"CaseClassEncoder($jvmRepr)"
+
+  override protected[spark_encoders] def agnostic: AgnosticEncoder[A] =
+    val fields = labels.zip(encoders).map { (label, enc) =>
+      EncoderField(label, enc.agnostic, enc.nullable, Metadata.empty)
+    }
+    StructEncoder(implicitly[ClassTag[A]], fields, None)
 }

@@ -177,7 +177,7 @@ class TypedEncoderSpec extends SparkAnyWordSpec() with TypedEncoderMatchers with
 
       "gracefully fail when null values used in required fields" in {
         UserOptAge("Pavlo", null) should failToSerializeWith[UserOptAge](
-          "Error while encoding: java.lang.NullPointerException: Null value appeared in non-nullable field")
+          "[NOT_NULL_ASSERT_VIOLATION] NULL value appeared in non-nullable field")
       }
 
       "support required nested product" in {
@@ -210,7 +210,7 @@ class TypedEncoderSpec extends SparkAnyWordSpec() with TypedEncoderMatchers with
 
       "gracefully fail when null value used as nested product" in {
         SimpleTaskOptUser("t1", null) should failToSerializeWith[SimpleTaskOptUser](
-          "Error while encoding: java.lang.NullPointerException: Null value appeared in non-nullable field")
+          "[NOT_NULL_ASSERT_VIOLATION] NULL value appeared in non-nullable field")
       }
 
       "support remapping via dataframe map function" in {
@@ -242,9 +242,22 @@ class TypedEncoderSpec extends SparkAnyWordSpec() with TypedEncoderMatchers with
         ds.schema shouldBe StructType(Seq.empty)
         ds.collect().head shouldBe EmptyCaseObject
       }
+
+      "expose struct metadata" in {
+        val enc = TypedEncoder[SimpleUser].encoder.resolveAndBind()
+        enc.encoder.isStruct shouldBe true
+        enc.encoder.schema.fieldNames.toSeq shouldBe Seq("name", "age")
+      }
     }
 
     "used with ADT type" should {
+
+      "expose struct metadata" in {
+        val enc = TypedEncoder[WorkItem].encoder.resolveAndBind()
+        enc.encoder.isStruct shouldBe true
+        enc.encoder.schema.fieldNames.headOption shouldBe Some("_type")
+        enc.encoder.schema.fieldNames.contains("value") shouldBe false
+      }
 
       "support sub types with 1 same field and 1 different" in {
         val schema = StructType(Seq(
@@ -346,8 +359,8 @@ class TypedEncoderSpec extends SparkAnyWordSpec() with TypedEncoderMatchers with
 
       "fail with sub types that have same field of different type" in {
         // note: ideally code should not compile with this error, need to write out own macro
-        the[SparkException].thrownBy(TypedEncoder[WorkItemDiffType]).getMessage shouldBe
-          "[INTERNAL_ERROR] Standard ADT encoder does not support subtypes that have same field names with different types. Field 'size' has conflicting types: IntegerType, FloatType"
+        the[SparkException].thrownBy(TypedEncoder[WorkItemDiffType]).getMessage should include (
+          "Field 'size' has conflicting types: IntegerType, FloatType")
       }
 
       "support nested enums via case objects encoded as string" in {
