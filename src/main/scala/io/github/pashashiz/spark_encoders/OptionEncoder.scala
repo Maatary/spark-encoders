@@ -1,7 +1,7 @@
 package io.github.pashashiz.spark_encoders
 
 import org.apache.spark.sql.catalyst.encoders.{AgnosticEncoder, AgnosticEncoders, EncoderUtils}
-import org.apache.spark.sql.catalyst.expressions.Expression
+import org.apache.spark.sql.catalyst.expressions.{Expression, If, IsNull, Literal}
 import org.apache.spark.sql.catalyst.expressions.objects.{UnwrapOption, WrapOption}
 import org.apache.spark.sql.types.{DataType, ObjectType}
 
@@ -25,14 +25,15 @@ case class OptionEncoder[A]()(implicit inner: TypedEncoder[A]) extends TypedEnco
     val unwrapped = UnwrapOption(optionType, path)
     // note: unboxed is noop for objects
     val unboxed = Primitive.unbox(unwrapped, catalystRepr)
-    // note: we do not add IfNull expression cause usually inner Expression
-    // should tolerate null input argument and should short circuit and return null already (such as Invoke)
-    // yet if we hit the case when that is not true, we might add it here
-    inner.toCatalyst(unboxed)
+    val innerExpr = inner.toCatalyst(unboxed)
+    val nullExpr = Literal.create(null, innerExpr.dataType)
+    If(IsNull(unboxed), nullExpr, innerExpr)
   }
 
   override def fromCatalyst(path: Expression): Expression = {
-    WrapOption(inner.fromCatalyst(path), inner.jvmRepr)
+    val valueExpr = inner.fromCatalyst(path)
+    val nullExpr = Literal.create(null, inner.jvmRepr)
+    WrapOption(If(IsNull(path), nullExpr, valueExpr), inner.jvmRepr)
   }
 
   override def toString: String = s"OptionEncoder(${inner.jvmRepr})"

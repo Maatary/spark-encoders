@@ -15,6 +15,8 @@ import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 class TypedEncoderSpec extends SparkAnyWordSpec() with TypedEncoderMatchers with SampleEncoders
     with TypedEncoderImplicits {
+  import io.github.pashashiz.spark_encoders.product.{RawChange, User}
+  import io.github.pashashiz.spark_encoders.product.ProductExamples._
 
   "TypedEncoder" when {
 
@@ -211,6 +213,22 @@ class TypedEncoderSpec extends SparkAnyWordSpec() with TypedEncoderMatchers with
       "gracefully fail when null value used as nested product" in {
         SimpleTaskOptUser("t1", null) should failToSerializeWith[SimpleTaskOptUser](
           "[NOT_NULL_ASSERT_VIOLATION] NULL value appeared in non-nullable field")
+      }
+
+      "mark non-optional nested product as non-nullable in resolved schema" in {
+        val enc = TypedEncoder[RawChange[User]].encoder.resolveAndBind()
+        enc.schema("entity").nullable shouldBe false
+        enc.encoder.schema("entity").nullable shouldBe false
+      }
+
+      "keep optional nested product nullable and round-trip" in {
+        val ts = new Timestamp(0L)
+        val ds = spark.createDataset(
+          List(RawChange[Option[User]](None, "c", 1L, ts)))
+        ds.collect().head.entity shouldBe None
+        val enc = TypedEncoder[RawChange[Option[User]]].encoder.resolveAndBind()
+        enc.schema("entity").nullable shouldBe true
+        enc.encoder.schema("entity").nullable shouldBe true
       }
 
       "support remapping via dataframe map function" in {
