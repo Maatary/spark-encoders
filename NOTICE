@@ -1,0 +1,7 @@
+Spark Encoders (fork)
+Copyright 2019–2025 Pavlo Pohrebnyi
+Modifications © 2025 Maatari Okouya
+
+This fork originates from https://github.com/pashashiz/spark-encoders and
+retains its Apache 2.0 licensing. Portions of this software are derived from
+Apache Spark (licensed to the Apache Software Foundation).

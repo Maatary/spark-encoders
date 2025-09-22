@@ -1,5 +1,8 @@
 # Spark Encoders
 
+Maintained by Maatari Okouya — forked from [pashashiz/spark-encoders](https://github.com/pashashiz/spark-encoders).
+Original library by Pavlo Pohrebnyi, published under Apache 2.0.
+
 ## Intro
 
 This is a light-weight Scala library for compile-time derivation of Spark `org.apache.spark.sql.Encoder`. It offers
@@ -69,7 +72,7 @@ types. However, this approach has significant limitations:
 Add the following library dependency using your build tool (e.g., sbt):
 
 ```scala
-libraryDependencies += "io.github.pashashiz" %% "spark-encoders" % "0.1.0" // Check latest version
+libraryDependencies += "io.github.maatary" %% "spark-encoders" % "<latest>" // Check releases
 ```
 
 ### Deriving Your First Product Encoder
